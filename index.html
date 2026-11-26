@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f8f2">
+  <meta name="description" content="选好口味，避开忌口，午饭不再纠结。一个记得你昨天吃过什么的午餐推荐助手。">
+  <title>午饭有着落 · 今天吃点好的</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="header"><a class="brand" href="./" aria-label="午饭有着落首页"><span class="brand-icon">饭<span>·</span></span><span>午饭有着落<span class="brand-en">LUNCH, SORTED.</span></span></a><nav aria-label="主导航"><button class="nav-link active" id="nav-lunch">今天吃什么<span></span></button><button class="nav-link" id="nav-history">我的午餐记录 <span class="history-count" id="history-count">0</span></button></nav><button class="demo-pill" id="about-btn"><span></span> 可交互 Demo <span class="info-icon">i</span></button></header>
+  <main>
+    <section class="intro"><div><div class="eyebrow"><span class="sun">☀</span> <span id="date-label"></span><span class="eyebrow-dot">·</span> 午饭时间，照顾好自己</div><h1>今天午饭，<span>有着落了。</span><svg class="sparkle" viewBox="0 0 40 44" aria-hidden="true"><path d="M20 2v13M20 29v13M2 22h12M27 22h11M6 7l8 8M27 29l8 8M6 37l8-8M27 15l8-8"/></svg></h1><p>少一点纠结，多一点合口味。把今天这一餐交给我。</p></div><div class="intro-note"><span class="note-leaf">✳</span><span>好好工作，也要<br><strong>好好吃饭。</strong></span></div></section>
+    <div class="workspace">
+      <aside class="preferences" aria-label="午餐偏好">
+        <div class="panel-title"><h2><span>☷</span> 你的午饭偏好</h2><button class="text-btn" id="reset-prefs">重置</button></div><p class="panel-description">你负责选偏好，我负责想菜单。</p>
+        <div class="field"><div class="field-heading"><h3>今天想吃什么口味</h3><span>可多选</span></div><div class="chips" id="taste-chips"></div></div>
+        <div class="field"><div class="field-heading"><h3>这些食材，请避开</h3><span>严格排除</span></div><div class="chips avoid-chips" id="avoid-chips"></div><label class="custom-label" for="custom-avoid">还有别的忌口？</label><form id="custom-form" class="custom-input"><input id="custom-avoid" maxlength="12" placeholder="输入食材，如：香菇" aria-label="添加忌口食材"><button type="submit" aria-label="添加忌口食材">＋</button></form><p class="field-hint">按模拟菜单的食材标签排除；过敏请向商家核实。</p></div>
+        <div class="field budget-field"><div class="field-heading"><h3>一餐预算</h3><strong>¥<output id="budget-value" for="budget">35</output><small> 以内</small></strong></div><input id="budget" aria-label="一餐预算" type="range" min="15" max="50" step="1" value="35"><div class="range-label"><span>¥15</span><span>¥50</span></div></div>
+        <div class="toggle-row"><span><strong>少油少炸</strong><small>优先蒸、煮、炖，避开油炸</small></span><button type="button" class="switch on" id="light-toggle" role="switch" aria-checked="true" aria-label="少油少炸"><span></span></button></div>
+        <div class="toggle-row"><span><strong>这一餐，要有主食</strong><small>米饭、杂粮或面，都可以</small></span><button type="button" class="switch on" id="staple-toggle" role="switch" aria-checked="true" aria-label="要有主食"><span></span></button></div>
+        <button class="primary-button generate-button" id="generate-btn"><span>✧</span> 帮我选今天的午饭 <span>↗</span></button><p class="saved-note" id="saved-note">偏好保存在当前浏览器，下次不用重选</p>
+      </aside>
+      <section class="recommendations" aria-label="午饭推荐" aria-live="polite">
+        <div class="section-heading"><div><span class="eyebrow small">A LITTLE LESS OVERTHINKING</span><h2>这一餐，试试它 <span class="hand-arrow">↴</span></h2></div><span class="match-label" id="match-label"></span></div>
+        <div id="recommendation-content"></div>
+        <div class="alternatives-heading"><h3>也给你留了两个选择</h3><span>少翻几页，一样吃好</span></div><div class="alternatives" id="alternatives"></div>
+        <div class="memory-strip"><div class="memory-icon">↶</div><div><strong>记得昨天，今天换个花样</strong><p id="memory-description">记录昨天的午饭，今天就会避开同一道主菜。</p></div><button id="yesterday-btn">补记昨天 <span>↗</span></button></div>
+      </section>
+    </div>
+    <section class="history-section" id="history-section" tabindex="-1"><div class="history-title"><div><span class="eyebrow small">YOUR LUNCH JOURNAL</span><h2>每一餐，都算数。<span id="journal-count">0 天好好吃饭</span></h2></div><button class="text-btn" id="clear-history">清空记录</button></div><div id="history-list"></div></section>
+    <footer><a class="footer-brand" href="./">午饭有着落 <span>·</span> 好好吃饭，是日常的小事，也是大事。</a><span>AI 辅助设计与开发 · 模拟菜单 / 不提供下单 <button id="footer-about">关于这个 Demo ↗</button></span></footer>
+  </main>
+  <dialog id="detail-dialog"><button class="dialog-close" data-close aria-label="关闭">×</button><div id="detail-content"></div></dialog>
+  <dialog id="yesterday-dialog"><button class="dialog-close" data-close aria-label="关闭">×</button><span class="eyebrow small">A LITTLE MEMORY</span><h2>昨天午饭吃了什么？</h2><p class="dialog-subtitle">补记后，今天的推荐会避开同一道主菜。<br>同一道主菜换了套餐，也不会重复推荐。</p><label class="select-label" for="yesterday-select">昨天的主菜</label><select id="yesterday-select"></select><button class="primary-button" id="save-yesterday">记好了，今天换个口味</button></dialog>
+  <dialog id="confirm-dialog"><button class="dialog-close" data-close aria-label="关闭">×</button><div class="success-icon">✓</div><span class="eyebrow small">LUNCH, SORTED.</span><h2>今天午饭，有着落啦。</h2><p id="confirm-description"></p><div class="confirm-note">这顿饭已记入午餐记录。<br>明天再来，会为你换一道主菜。</div><button class="primary-button" id="confirm-done">好好吃饭去咯 ↗</button><p class="dialog-fine">这是模拟推荐，不会产生订单或扣款。</p></dialog>
+  <dialog id="about-dialog"><button class="dialog-close" data-close aria-label="关闭">×</button><span class="eyebrow small">BEHIND THE LITTLE HELPER</span><h2>把“随便吃点”变成<br>“就吃这个吧”。</h2><div class="about-copy"><h3>核心问题</h3><p>一个人吃午饭，反复翻菜单很累。用户需要的不是更多选项，而是少量符合口味、避开忌口、与昨天不同的可靠选择。</p><h3>方案思路</h3><p>先严格筛掉忌口、超预算和昨天吃过的主菜，再按口味匹配排序。默认少油不炸、包含主食，每次只突出一份推荐和两份备选，并说清推荐理由。</p><h3>AI 做了什么</h3><p>使用 AI 辅助需求拆解、交互设计、模拟菜单、代码实现与测试。Demo 使用本地规则推荐，没有接入在线大模型；偏好和记录仅保存在当前浏览器。</p><h3>体验边界</h3><p>16 份模拟餐食，价格包含模拟配送费用；餐图为示意图，不代表对应菜品。无真实商家、营养测算、配送或下单功能。忌口按已知食材精确标签排除，不承诺过敏安全。</p></div><a class="repo-link" href="https://github.com/LuMH1027/food" target="_blank" rel="noopener noreferrer">查看 GitHub 源码 ↗</a></dialog>
+  <div class="toast" id="toast" role="status"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
