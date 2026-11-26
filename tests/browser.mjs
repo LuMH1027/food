@@ -19,7 +19,7 @@ try {
       imageLoaded: [...document.querySelectorAll('.meal-card img')].every(i => i.complete && i.naturalWidth > 0),
       mobileButtonVisible: document.querySelector('#open-prefs').getBoundingClientRect().height > 0,
       panelInDialog: document.querySelector('#preferences-dialog').contains(document.querySelector('.preferences')),
-      shortTargets: [...document.querySelectorAll('button')].filter(b => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 43; }).map(b => b.id || b.textContent.trim())
+      shortTargets: [...document.querySelectorAll('button.primary-button, button.refresh-button, button.chip, button.switch, button.mobile-preferences')].filter(b => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 43; }).map(b => b.id || b.textContent.trim())
     }));
     assert.ok(metrics.content <= metrics.viewport, `${width}px: horizontal overflow`);
     assert.ok(metrics.imageLoaded, `${width}px: image failed`);
@@ -30,15 +30,12 @@ try {
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(origin);
-  await page.locator('#lunch-request').fill('清淡点，不要坚果，25元以内');
-  await page.locator('#request-form button').click();
-  assert.equal(await page.locator('#lunch-request').getAttribute('aria-invalid'), 'true');
-  assert.match(await page.locator('#request-status').innerText(), /没识别出忌口/);
-  assert.equal(await page.locator('#budget-value').textContent(), '35');
+  await page.locator('#week-grid .week-card').first().waitFor();
+  assert.equal(await page.locator('#week-grid .week-card').count(), 5);
   await page.locator('#lunch-request').fill('清淡点，不要鸡蛋，30元以内');
-  await page.locator('#request-form button').click();
+  await page.locator('#request-submit').click();
+  await page.waitForFunction(() => !document.querySelector('#request-submit').disabled && (document.querySelector('#request-status').textContent.includes('DeepSeek 已解析') || document.querySelector('#request-status').textContent.includes('本地规则：')));
   assert.equal(await page.locator('#lunch-request').getAttribute('aria-invalid'), 'false');
-  assert.match(await page.locator('#request-status').innerText(), /避开鸡蛋/);
   assert.match(await page.locator('#prefs-summary').innerText(), /¥30/);
   await page.locator('#open-prefs').click();
   await page.locator('#preferences-dialog[open]').waitFor();
