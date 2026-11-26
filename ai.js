@@ -1,4 +1,4 @@
-import { TASTES, recommend } from './engine.js';
+import { TASTES, recommend, yesterdayKey } from './engine.js';
 
 const KEY_STORAGE = 'lunch-deepseek-key-v1';
 const MODEL = 'deepseek-flash';
@@ -145,7 +145,7 @@ orderNote: 一句可直接贴给外卖商家的短备注，不超过24字。`;
   const user = JSON.stringify({
     request: String(userText || '').trim().slice(0, 200),
     currentPrefs: { tastes: current.tastes, avoids: current.avoids, budget: current.budget, light: current.light, staple: current.staple },
-    yesterdayMain: history.find(h => h.date)?.main || null,
+    yesterdayMain: history.find(h => h.date === yesterdayKey(options.date))?.main || null,
     candidates: menuSummary
   });
 

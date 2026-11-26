@@ -1,4 +1,8 @@
-import { MEALS, TASTES, AVOIDS, SCENES, DEFAULT_PREFS, dateKey, yesterdayKey, recommend, reasonsFor, buildWeekPlan, buildOrderNote } from './engine.js';
+import {
+  MEALS, TASTES, AVOIDS, SCENES, DEFAULT_PREFS,
+  dateKey, yesterdayKey, recommend, reasonsFor,
+  buildWeekPlan, buildOrderNote, explainFunnel, matchPercent
+} from './engine.js';
 import { parseLunchRequest } from './request.js';
 import { detectProxy, getSavedKey, saveKey, recommendWithDeepSeek, testDeepSeekConnection } from './ai.js';
 
@@ -25,7 +29,7 @@ function normalizePrefs(data) {
     light: typeof data?.light === 'boolean' ? data.light : true,
     staple: typeof data?.staple === 'boolean' ? data.staple : true,
     blockedMains: Array.isArray(data?.blockedMains) ? [...new Set(data.blockedMains.filter(m => MEALS.some(x => x.main === m)))].slice(0, 15) : [],
-    favoriteIds: Array.isArray(data?.favoriteIds) ? [...new Set(data.favoriteIds.filter(id => MEALS.some(x => x.id === id)))].slice(0, 16) : []
+    favoriteIds: Array.isArray(data?.favoriteIds) ? [...new Set(data.favoriteIds.filter(id => MEALS.some(x => x.id === id)))].slice(0, 20) : []
   };
 }
 
@@ -41,6 +45,7 @@ let seen = new Set();
 let skipTodayIds = new Set();
 let activeScene = null;
 let activeMaxEta = null;
+let weekOffset = 0;
 let aiOverride = null; // { mealId, reason, orderNote }
 let aiState = { proxy: false, model: 'deepseek-flash', busy: false };
 let lastDate = dateKey();
@@ -63,14 +68,28 @@ function updateAiStatus() {
   const ready = hasAiReady();
   $('#ai-dot').classList.toggle('on', ready);
   $('#ai-status-text').textContent = aiState.proxy ? 'DeepSeek 已连' : getSavedKey() ? 'DeepSeek 已配' : '接入 DeepSeek';
+  const badge = $('#engine-mode-badge');
+  if (badge) {
+    badge.textContent = ready ? 'DeepSeek AI + 规则兜底' : '本地语义规则引擎';
+    badge.classList.toggle('ai-live', ready);
+  }
   $('#ai-mode-desc').textContent = aiState.proxy
-    ? `已通过本地安全代理连接 DeepSeek（${aiState.model}），无需在浏览器填写 Key。`
-    : '填入你的 DeepSeek Key（仅存本地浏览器）即可启用 deepseek-flash 场景理解与理由生成。';
+    ? `已通过安全代理连接 DeepSeek（${aiState.model}），无需在浏览器填写 Key。`
+    : '填入你的 DeepSeek Key（仅存本地浏览器）即可启用 deepseek-flash 场景理解与理由生成。未配置时本地语义规则无缝可用。';
   $('#ai-key-input').value = getSavedKey();
 }
 
+function setActiveNav(id) {
+  for (const el of document.querySelectorAll('.nav-link')) {
+    const active = el.id === id;
+    el.classList.toggle('active', active);
+    if (active) el.setAttribute('aria-current', 'page');
+    else el.removeAttribute('aria-current');
+  }
+}
+
 function renderScenes() {
-  $('#scene-chips').innerHTML = SCENES.map(s => `<button type="button" class="scene-chip ${activeScene === s.id ? 'active' : ''}" data-scene="${s.id}" aria-pressed="${activeScene === s.id}">${escape(s.label)}</button>`).join('');
+  $('#scene-chips').innerHTML = SCENES.map(s => `<button type="button" class="scene-chip ${activeScene === s.id ? 'active' : ''}" data-scene="${s.id}" aria-pressed="${activeScene === s.id}"><span aria-hidden="true">${s.icon || ''}</span>${escape(s.label)}</button>`).join('');
 }
 
 function renderPrefs() {
@@ -89,50 +108,89 @@ function renderPrefs() {
   $('#blocked-chips').innerHTML = blocked.map(m => `<button type="button" class="chip" data-unblock="${escape(m)}">↺ ${escape(m)}</button>`).join('');
 }
 
+function renderFunnel() {
+  const f = explainFunnel(prefs, history, new Date(), { skipIds: [...skipTodayIds], maxEta: activeMaxEta });
+  const steps = [
+    `<span class="funnel-step">菜单库 ${f.total} 道</span>`
+  ];
+  if (prefs.avoids.length) {
+    steps.push(`<span class="funnel-step ${f.avoidRemoved ? 'active' : ''}">忌口过滤 ${f.avoidRemoved ? `-${f.avoidRemoved}` : '0'}</span>`);
+  }
+  if (prefs.light || prefs.staple) {
+    const label = [prefs.light ? '少油' : '', prefs.staple ? '有主食' : ''].filter(Boolean).join('/');
+    steps.push(`<span class="funnel-step ${f.healthRemoved ? 'active' : ''}">${label} ${f.healthRemoved ? `-${f.healthRemoved}` : '0'}</span>`);
+  }
+  if (f.yesterdayMain || (prefs.blockedMains && prefs.blockedMains.length)) {
+    const label = f.yesterdayMain ? `避开昨日(${escape(f.yesterdayMain)})` : '已屏蔽主菜';
+    steps.push(`<span class="funnel-step ${f.dedupRemoved ? 'active' : ''}">${label} ${f.dedupRemoved ? `-${f.dedupRemoved}` : '0'}</span>`);
+  }
+  steps.push(`<span class="funnel-step ${f.budgetRemoved ? 'active' : ''}">≤¥${prefs.budget}${activeMaxEta ? `·≤${activeMaxEta}分` : ''} ${f.budgetRemoved ? `-${f.budgetRemoved}` : '0'}</span>`);
+  steps.push(`<span class="funnel-step ${f.remaining ? 'result' : 'warn'}">可选 ${f.remaining} 道</span>`);
+
+  $('#funnel-bar').innerHTML = steps.join('<span class="funnel-arrow" aria-hidden="true">→</span>');
+}
+
 function tagsFor(m) {
-  return [m.cooking, m.staple || '无主食', `约 ${m.eta} 分钟`, m.protein].map(t => `<span>${escape(t)}</span>`).join('');
+  return [m.cooking, m.staple || '无主食', `约 ${m.eta} 分钟`, `${m.kcal} kcal`, m.protein].map(t => `<span>${escape(t)}</span>`).join('');
 }
 
 function renderRecommendations() {
+  renderFunnel();
   const meal = pool.find(m => m.id === selectedId);
   $('#match-label').textContent = pool.length ? `${pool.length} 份可选` : '先照顾好你的偏好';
   if (!meal) {
     $('.alternatives-heading').classList.add('hidden');
     $('#alternatives').classList.add('hidden');
-    $('#recommendation-content').innerHTML = `<div class="empty-state"><div class="empty-icon">🥣</div><h3>这一轮，还没找到合适的。</h3><p>当前 ${MEALS.length} 份模拟餐食中，没有同时满足所有条件的选择。可以提高预算，或恢复已跳过的菜品。</p><p class="empty-detail">忌口和昨天的主菜仍严格避开，不会自动放宽。</p><div class="empty-actions"><button class="primary-button btn btn--primary" id="raise-budget">预算调到 ¥50</button>${(skipTodayIds.size || activeMaxEta) ? '<button class="refresh-button btn btn--secondary" id="clear-temp-filters">放宽时效/跳过</button>' : ''}</div><button class="text-btn" id="edit-preferences">回到偏好设置 ↗</button></div>`;
+    $('#recommendation-content').innerHTML = `<div class="empty-state"><div class="empty-icon">🥣</div><h3>这一轮，还没找到合适的。</h3><p>当前 ${MEALS.length} 份模拟餐食中，没有同时满足所有条件的选择。可以提高预算，或放宽临时筛选。</p><p class="empty-detail">硬约束保护：忌口与昨天的主菜严格避开，不会自动放宽。</p><div class="empty-actions"><button class="primary-button btn btn--primary" id="raise-budget">预算调到 ¥50</button>${(skipTodayIds.size || activeMaxEta) ? '<button class="refresh-button btn btn--secondary" id="clear-temp-filters">放宽时效/跳过</button>' : ''}</div><button class="text-btn" id="edit-preferences">回到偏好设置 ↗</button></div>`;
     $('#alternatives').innerHTML = '';
     return;
   }
 
-  const baseReasons = reasonsFor(meal, prefs, history).filter(r => !r.includes('少油不炸') && !r.includes('午饭吃踏实'));
+  const baseReasons = reasonsFor(meal, prefs, history);
   const aiReason = aiOverride && aiOverride.mealId === meal.id && aiOverride.reason ? aiOverride.reason : '';
-  const reasons = aiReason ? [`DeepSeek：${aiReason}`, ...baseReasons] : baseReasons;
+  const pct = matchPercent(meal, prefs, { sceneId: activeScene });
   const today = history.find(h => h.date === dateKey());
   const isFav = (prefs.favoriteIds || []).includes(meal.id);
   const fallback = prefs.tastes.length && !meal.tastes.some(t => prefs.tastes.includes(t))
-    ? `<p class="taste-fallback">暂无「${prefs.tastes.map(escape).join('、')}」口味，先看看符合预算与忌口的选择。</p>`
+    ? `<p class="taste-fallback">暂无「${prefs.tastes.map(escape).join('、')}」口味，已优先展示严格符合忌口、预算与健康约束的餐食。</p>`
     : '';
 
-  $('#recommendation-content').innerHTML = `${fallback}<article class="meal-card"><div class="meal-visual"><img src="./assets/${meal.image}.jpg" alt="餐食氛围示意图，非对应菜品实拍" width="900" height="600" fetchpriority="high"><span class="illustration-label">餐食示意</span></div><div class="meal-body"><div class="meal-title-row"><div><h3>${escape(meal.name)}</h3><p class="shop">${escape(meal.shop)}</p></div><div class="price"><small>¥</small>${meal.price}<span>模拟价</span></div></div><div class="meal-tags">${tagsFor(meal)}</div><div class="reason-box"><ul class="reason-list">${reasons.map(r => `<li>${escape(r)}</li>`).join('')}</ul></div><div class="card-actions"><button class="primary-button btn btn--primary choose-button" data-choose="${meal.id}">${today?.mealId === meal.id ? '✓ 今天已选这份' : today ? '今天改吃这份' : '就吃这份'} <span>↗</span></button><button class="refresh-button btn btn--secondary" id="refresh-btn" ${pool.length < 2 ? 'disabled' : ''}><span>↻</span> 换一道</button></div><div class="card-meta-actions"><button class="meta-link" data-fav="${meal.id}" aria-pressed="${isFav}">${isFav ? '★ 已收藏' : '☆ 收藏常吃'}</button><button class="meta-link" data-block="${escape(meal.main)}">以后不推${escape(meal.main)}</button><button class="meta-link" data-detail="${meal.id}">食材详情 ↗</button></div></div></article>`;
+  const reasonItems = [
+    ...(aiReason ? [`<li class="reason-ai">DeepSeek 推荐：${escape(aiReason)}</li>`] : []),
+    ...baseReasons.map(r => `<li>${escape(r)}</li>`)
+  ];
+  if (!reasonItems.length) {
+    reasonItems.push(`<li>${escape(meal.subtitle)}</li>`);
+  }
+
+  const badgeText = aiReason
+    ? `✦ AI 优选 · 契合度 ${pct}%`
+    : `★ 今日首选 · 契合度 ${pct}%`;
+
+  $('#recommendation-content').innerHTML = `${fallback}<article class="meal-card"><div class="meal-visual"><img src="./assets/${meal.image}.jpg" alt="餐食氛围示意图，非对应菜品实拍" width="900" height="600" fetchpriority="high"><span class="meal-badge-top">${badgeText}</span><span class="illustration-label">餐食示意</span></div><div class="meal-body"><div class="meal-title-row"><div><h3>${escape(meal.name)}</h3><p class="shop">${escape(meal.shop)} · 预计 ${meal.eta} 分钟送达</p></div><div class="price"><small>¥</small>${meal.price}<span>模拟到手价</span></div></div><div class="meal-tags">${tagsFor(meal)}</div><div class="reason-box"><ul class="reason-list">${reasonItems.join('')}</ul></div><div class="card-actions"><button class="primary-button btn btn--primary choose-button" data-choose="${meal.id}">${today?.mealId === meal.id ? '✓ 今天已选这份' : today ? '今天改吃这份' : '就吃这份，开饭'} <span>↗</span></button><button class="refresh-button btn btn--secondary" id="refresh-btn" ${pool.length < 2 ? 'disabled' : ''}><span>↻</span> 换一道</button></div><div class="card-meta-actions"><button class="meta-link ${isFav ? 'is-fav' : ''}" data-fav="${meal.id}" aria-pressed="${isFav}">${isFav ? '★ 已收藏常吃' : '☆ 收藏常吃'}</button><button class="meta-link" data-block="${escape(meal.main)}">以后不推${escape(meal.main)}</button><button class="meta-link" data-detail="${meal.id}">全部食材详情 ↗</button></div></div></article>`;
 
   const otherMains = pool.filter(m => m.id !== meal.id && m.main !== meal.main);
   const alternatives = otherMains.filter((m, index, list) => list.findIndex(x => x.main === m.main) === index).slice(0, 2);
-  $('#alternatives').innerHTML = alternatives.map(m => `<button class="alternative" data-select="${m.id}" aria-label="改看${escape(m.name)}"><span class="alternative-image-frame"><img class="alternative-img" src="./assets/thumbnails/${m.image}.jpg" alt="餐食示意图" width="88" height="88" loading="lazy"></span><div class="alternative-body"><h4>${escape(m.name)}</h4><small>${m.cooking} · 约 ${m.eta} 分钟</small><span class="alternative-price">¥${m.price}</span><span class="alternative-arrow">↗</span></div></button>`).join('');
-  $('.alternatives-heading h3').textContent = alternatives.length === 1 ? '另一个选择' : '换个选择';
+  $('#alternatives').innerHTML = alternatives.map(m => `<button class="alternative" data-select="${m.id}" aria-label="改看${escape(m.name)}"><span class="alternative-image-frame"><img class="alternative-img" src="./assets/thumbnails/${m.image}.jpg" alt="餐食示意图" width="88" height="88" loading="lazy"></span><div class="alternative-body"><h4>${escape(m.name)}</h4><small>${m.cooking} · 约 ${m.eta} 分钟 · ${m.kcal} kcal</small><span class="alternative-price">¥${m.price}</span><span class="alternative-arrow">↗</span></div></button>`).join('');
+  $('.alternatives-heading h3').textContent = alternatives.length === 1 ? '另一个备选' : '换个选择';
   $('.alternatives-heading').classList.toggle('hidden', alternatives.length === 0);
   $('#alternatives').classList.toggle('hidden', alternatives.length === 0);
 }
 
 function renderWeekPlan() {
-  const plan = buildWeekPlan(prefs, history, weekLocked);
+  const plan = buildWeekPlan(prefs, history, weekLocked, new Date(), weekOffset);
   const validMeals = plan.filter(d => d.meal);
   const total = validMeals.reduce((sum, d) => sum + d.meal.price, 0);
-  $('#week-budget').textContent = validMeals.length ? `5 天预计 ¥${total} · 均价 ¥${Math.round(total / validMeals.length)}` : '当前偏好下暂无可排菜单';
+  const todayDayIdx = new Date().getDay() - 1; // 0=Mon..4=Fri
+  $('#week-budget').textContent = validMeals.length
+    ? `连续 5 天主菜不重样 · 预计共 ¥${total}（均价 ¥${Math.round(total / validMeals.length)}/餐）`
+    : '当前偏好下暂无可排菜单';
   $('#week-grid').innerHTML = plan.map(item => {
+    const isToday = item.dayIndex === todayDayIdx;
     if (!item.meal) {
       return `<article class="week-card empty"><strong>${item.day}</strong><p>暂无符合条件餐食</p></article>`;
     }
-    return `<article class="week-card"><div class="week-card-top"><span class="week-day">${item.day}</span><div class="week-card-actions"><button type="button" class="week-mini-btn ${item.locked ? 'locked' : ''}" data-week-lock="${item.dayIndex}" data-meal-id="${item.meal.id}" aria-pressed="${item.locked}">${item.locked ? '已锁定' : '锁定'}</button><button type="button" class="week-mini-btn" data-week-swap="${item.dayIndex}" data-meal-id="${item.meal.id}">换</button></div></div><button type="button" class="week-pick" data-select="${item.meal.id}"><h3>${escape(item.meal.name)}</h3><p>¥${item.meal.price} · ${item.meal.cooking} · ${item.meal.staple || '无主食'}</p></button></article>`;
+    return `<article class="week-card ${isToday ? 'is-today' : ''}"><div class="week-card-top"><span class="week-day">${item.day}${isToday ? '<span class="week-today-dot">今天</span>' : ''}</span><div class="week-card-actions"><button type="button" class="week-mini-btn ${item.locked ? 'locked' : ''}" data-week-lock="${item.dayIndex}" data-meal-id="${item.meal.id}" aria-pressed="${item.locked}">${item.locked ? '🔒 已锁' : '锁定'}</button><button type="button" class="week-mini-btn" data-week-swap="${item.dayIndex}" data-meal-id="${item.meal.id}">换</button></div></div><button type="button" class="week-pick" data-select="${item.meal.id}"><h3>${escape(item.meal.name)}</h3><p>¥${item.meal.price} · ${item.meal.cooking} · ${item.meal.staple || '无主食'}</p></button></article>`;
   }).join('');
 }
 
@@ -167,7 +225,7 @@ function savePrefs() {
 
 function updateMemory() {
   const previous = history.find(h => h.date === yesterdayKey());
-  $('#memory-description').textContent = previous ? `昨天吃了${previous.main}，今天已帮你避开。` : '补记主菜，明天不重样。';
+  $('#memory-description').textContent = previous ? `昨天吃了「${previous.main}」，今天已自动从候选中排除（含跨套餐同主菜）。` : '补记昨天主菜，今天自动避开不重样。';
   $('#yesterday-btn').innerHTML = `${previous ? '修改昨天' : '补记昨天'} <span>↗</span>`;
 }
 
@@ -176,10 +234,10 @@ function renderHistory() {
   $('#journal-count').textContent = `${history.length} 条记录`;
   $('#clear-history').classList.toggle('hidden', history.length === 0);
   if (!history.length) {
-    $('#history-list').innerHTML = '<div class="history-empty"><span>♧</span> 选好今天的午饭，这里会记住。</div>';
+    $('#history-list').innerHTML = '<div class="history-empty"><span>♧</span> 选好今天的午饭，这里会记住，明天自动帮你换主菜。</div>';
     return;
   }
-  $('#history-list').innerHTML = `<div class="history-items">${[...history].sort((a, b) => b.date.localeCompare(a.date)).map(h => { const m = MEALS.find(x => x.id === h.mealId); return `<article class="history-item"><div class="journal-emoji"><img src="./assets/thumbnails/${m.image}.jpg" alt="" width="56" height="56" loading="lazy"></div><div><time datetime="${h.date}">${h.date === dateKey() ? '今天' : h.date === yesterdayKey() ? '昨天' : h.date} · 午饭</time><h3>${escape(m.name)}</h3><p>¥${m.price} · ${m.cooking}</p></div><button class="history-delete" data-delete="${h.date}" aria-label="删除${h.date}的午餐记录">×</button></article>`; }).join('')}</div>`;
+  $('#history-list').innerHTML = `<div class="history-items">${[...history].sort((a, b) => b.date.localeCompare(a.date)).map(h => { const m = MEALS.find(x => x.id === h.mealId); return `<article class="history-item"><div class="journal-emoji"><img src="./assets/thumbnails/${m.image}.jpg" alt="" width="56" height="56" loading="lazy"></div><div><time datetime="${h.date}">${h.date === dateKey() ? '今天' : h.date === yesterdayKey() ? '昨天' : h.date} · 午饭</time><h3>${escape(m.name)}</h3><p>¥${m.price} · ${m.cooking} · 主菜：${escape(m.main)}</p></div><button class="history-delete" data-delete="${h.date}" aria-label="删除${h.date}的午餐记录">×</button></article>`; }).join('')}</div>`;
 }
 
 function saveMeal(meal, date) {
@@ -197,7 +255,7 @@ function choose(id) {
   selectedId = id;
   renderRecommendations();
   renderWeekPlan();
-  $('#confirm-description').textContent = `${meal.name} · ¥${meal.price} · 约 ${meal.eta} 分钟`;
+  $('#confirm-description').textContent = `${meal.name} · ¥${meal.price} · 预计 ${meal.eta} 分钟送达`;
   const note = aiOverride?.mealId === meal.id && aiOverride?.orderNote
     ? `${meal.name}（${meal.shop} · ¥${meal.price}）｜外卖备注：${aiOverride.orderNote}`
     : buildOrderNote(meal, prefs);
@@ -257,14 +315,17 @@ async function handleSentenceRequest(rawText) {
     }
   }
 
-  // 本地规则兜底
+  // 本地语义规则兜底
   const result = parseLunchRequest(text, prefs);
-  statusEl.textContent = result.error || `本地规则：${result.recognized.join(' · ')}`;
+  statusEl.textContent = result.error || `本地语义解析：${result.recognized.join(' · ')}`;
   statusEl.classList.toggle('is-error', Boolean(result.error));
   $('#lunch-request').setAttribute('aria-invalid', String(Boolean(result.error)));
   if (result.error) { $('#lunch-request').focus(); return; }
   aiOverride = null;
   prefs = result.prefs;
+  activeScene = result.sceneId || null;
+  activeMaxEta = result.maxEta || null;
+  renderScenes();
   savePrefs();
   $('.recommendations').scrollIntoView({ behavior: motionBehavior(), block: 'nearest' });
 }
@@ -272,6 +333,25 @@ async function handleSentenceRequest(rawText) {
 $('#request-form').addEventListener('submit', event => {
   event.preventDefault();
   handleSentenceRequest($('#lunch-request').value);
+});
+
+$('#demo-xiaoa-btn').addEventListener('click', () => {
+  prefs = {
+    ...structuredClone(DEFAULT_PREFS),
+    tastes: ['清淡', '家常'],
+    avoids: ['香菜'],
+    budget: 32,
+    light: true,
+    staple: true
+  };
+  const yesterdayMeal = MEALS.find(m => m.id === 'tomato-beef') || MEALS[1];
+  saveMeal(yesterdayMeal, yesterdayKey());
+  writeStorage('lunch-prefs-v1', prefs);
+  renderPrefs();
+  const prompt = '下午要开会不想犯困，少油清爽一点，不要香菜，32元以内';
+  $('#lunch-request').value = prompt;
+  toast('已代入小A场景：昨日吃了番茄炖牛腩，今天自动避开');
+  handleSentenceRequest(prompt);
 });
 
 document.addEventListener('click', event => {
@@ -287,6 +367,10 @@ document.addEventListener('click', event => {
     if (activeScene) {
       $('#lunch-request').value = scene.prompt;
       if (hasAiReady()) { handleSentenceRequest(scene.prompt); return; }
+      $('#request-status').classList.remove('is-error');
+      $('#request-status').textContent = `已切至场景「${scene.label}」${activeMaxEta ? `（≤${activeMaxEta}分钟）` : ''}`;
+    } else {
+      $('#request-status').textContent = '';
     }
     generate({ notify: true });
   }
@@ -309,7 +393,7 @@ document.addEventListener('click', event => {
     const main = button.dataset.block;
     prefs.blockedMains = [...new Set([...(prefs.blockedMains || []), main])];
     savePrefs();
-    toast(`以后不再推荐「${main}」，可在偏好中恢复`);
+    toast(`以后不再推荐「${main}」，可在左侧偏好中恢复`);
   }
   if (button.dataset.fav) {
     const id = button.dataset.fav;
@@ -318,14 +402,14 @@ document.addEventListener('click', event => {
     prefs.favoriteIds = exists ? list.filter(x => x !== id) : [...list, id];
     writeStorage('lunch-prefs-v1', prefs);
     renderRecommendations();
-    toast(exists ? '已取消收藏' : '已收藏，后续会优先考虑');
+    toast(exists ? '已取消收藏' : '已收藏，后续推荐会优先加权');
   }
   if (button.dataset.select) {
     seen.add(selectedId);
     selectedId = button.dataset.select;
     renderRecommendations();
     $('.recommendations').scrollIntoView({ behavior: motionBehavior(), block: 'nearest' });
-    toast('已切换到这份');
+    toast('已切换到这份餐食');
   }
   if (button.dataset.weekLock !== undefined) {
     const idx = button.dataset.weekLock;
@@ -383,6 +467,8 @@ $('#reset-prefs').addEventListener('click', () => {
   activeMaxEta = null;
   aiOverride = null;
   skipTodayIds.clear();
+  $('#lunch-request').value = '';
+  $('#request-status').textContent = '';
   renderScenes();
   savePrefs();
   toast('偏好已恢复默认');
@@ -395,24 +481,9 @@ $('#generate-btn').addEventListener('click', () => {
 });
 
 $('#refresh-week').addEventListener('click', () => {
-  const kept = {};
-  for (const [k, v] of Object.entries(weekLocked)) {
-    if (MEALS.some(m => m.id === v)) kept[k] = v;
-  }
-  weekLocked = {};
-  writeStorage('lunch-week-locked-v1', weekLocked);
-  // 打乱顺序重排
-  const list = recommend(prefs, history);
-  if (list.length > 1) {
-    const shift = Math.floor(Math.random() * (list.length - 1)) + 1;
-    for (let i = 0; i < 5; i++) {
-      if (!kept[i]) weekLocked[i] = list[(i + shift) % list.length].id;
-      else weekLocked[i] = kept[i];
-    }
-    writeStorage('lunch-week-locked-v1', weekLocked);
-  }
+  weekOffset += 1;
   renderWeekPlan();
-  toast('已重排工作日菜单');
+  toast('已重排未锁定的工作日菜单');
 });
 
 $('#copy-order-note').addEventListener('click', async () => {
@@ -469,9 +540,9 @@ $('#yesterday-btn').addEventListener('click', () => {
 });
 $('#save-yesterday').addEventListener('click', () => { const meal = MEALS.find(m => m.id === $('#yesterday-select').value); if (!meal) return; saveMeal(meal, yesterdayKey()); $('#yesterday-dialog').close(); generate(); toast(`昨天的${meal.main}已记下，今天换点别的`); });
 $('#confirm-done').addEventListener('click', () => $('#confirm-dialog').close());
-$('#nav-history').addEventListener('click', () => { $('#history-section').scrollIntoView({ behavior: motionBehavior() }); $('#history-section').focus({ preventScroll: true }); });
-$('#nav-week').addEventListener('click', () => { $('#week-section').scrollIntoView({ behavior: motionBehavior() }); $('#week-section').focus({ preventScroll: true }); });
-$('#nav-lunch').addEventListener('click', () => window.scrollTo({ top: 0, behavior: motionBehavior() }));
+$('#nav-history').addEventListener('click', () => { setActiveNav('nav-history'); $('#history-section').scrollIntoView({ behavior: motionBehavior() }); $('#history-section').focus({ preventScroll: true }); });
+$('#nav-week').addEventListener('click', () => { setActiveNav('nav-week'); $('#week-section').scrollIntoView({ behavior: motionBehavior() }); $('#week-section').focus({ preventScroll: true }); });
+$('#nav-lunch').addEventListener('click', () => { setActiveNav('nav-lunch'); window.scrollTo({ top: 0, behavior: motionBehavior() }); });
 $('#clear-history').addEventListener('click', () => { if (!window.confirm('清空所有午餐记录？清空后将无法根据昨天的记录避开重复主菜。')) return; history = []; writeStorage('lunch-history-v1', history); renderHistory(); generate(); toast('午餐记录已清空'); });
 for (const id of ['#about-btn', '#footer-about']) $(id).addEventListener('click', () => showDialog('#about-dialog'));
 for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('click', e => { if (e.target === dialog) { const r = dialog.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dialog.close(); } });

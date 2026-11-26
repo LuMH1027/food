@@ -55,3 +55,18 @@ test('空白和未知请求会提示，不伪造理解结果', () => {
     assert.deepEqual(result.prefs, original());
   }
 });
+test('快捷职场场景句式和不要主食可被本地语义引擎识别', () => {
+  const focus = parseLunchRequest('下午要开会不想犯困，少油清爽一点，有杂粮或清淡主食', original());
+  assert.equal(focus.error, null);
+  assert.equal(focus.sceneId, 'focus');
+  assert.equal(focus.prefs.light, true);
+
+  const fast = parseLunchRequest('赶工时间紧，希望25分钟内送到，好下饭不折腾', original());
+  assert.equal(fast.error, null);
+  assert.equal(fast.sceneId, 'fast');
+  assert.equal(fast.maxEta, 25);
+
+  const noStaple = parseLunchRequest('清淡点，不要主食', original());
+  assert.equal(noStaple.error, null);
+  assert.equal(noStaple.prefs.staple, false);
+});

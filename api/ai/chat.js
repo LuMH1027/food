@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     res.status(503).json({ error: '服务端未配置 DEEPSEEK_API_KEY' });
     return;
   }
-  const baseUrl = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(//+$/, '');
+  const baseUrl = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/+$/, '');
   const model = process.env.DEEPSEEK_MODEL || 'deepseek-flash';
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});

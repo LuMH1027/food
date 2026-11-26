@@ -1,10 +1,10 @@
 export const TASTES = ['清淡', '家常', '香辣', '酸甜', '浓郁'];
 export const AVOIDS = ['香菜', '辣椒', '花生', '鸡蛋', '牛奶', '海鲜', '牛肉'];
 export const SCENES = [
-  { id: 'focus', label: '下午开会不犯困', prompt: '下午要开会不想犯困，少油清爽一点，有杂粮或清淡主食' },
-  { id: 'fast', label: '赶工 25 分钟送到', prompt: '赶工时间紧，希望25分钟内送到，好下饭不折腾' },
-  { id: 'save', label: '月底省钱吃饱', prompt: '控制预算在24元以内，要有主食能吃饱' },
-  { id: 'warm', label: '想喝口热汤', prompt: '今天想吃热乎汤面或炖菜，清淡舒服一点' }
+  { id: 'focus', label: '下午开会不犯困', icon: '⚡', prompt: '下午要开会不想犯困，少油清爽一点，有杂粮或清淡主食' },
+  { id: 'fast', label: '赶工 25 分钟送到', icon: '⏱', prompt: '赶工时间紧，希望25分钟内送到，好下饭不折腾' },
+  { id: 'save', label: '月底省钱吃饱', icon: '¥', prompt: '控制预算在24元以内，要有主食能吃饱' },
+  { id: 'warm', label: '想喝口热汤', icon: '♨', prompt: '今天想吃热乎汤面或炖菜，清淡舒服一点' }
 ];
 
 // 模拟外卖菜单：包含履约时效、餐食特征与已知食材标签（非真实商家，不作过敏安全承诺）。
@@ -24,7 +24,11 @@ export const MEALS = [
   { id: 'mapo-tofu', main: '麻婆豆腐', name: '麻婆豆腐盖饭', subtitle: '麻辣鲜香的豆腐盖饭，出餐快且实惠。', shop: '湘里有味 · 现炒', price: 21, eta: 21, kcal: 610, protein: '植物蛋白', scenes: ['save', 'fast'], tastes: ['香辣', '浓郁'], ingredients: ['豆腐', '猪肉', '辣椒', '花椒', '大米', '酱油'], staple: '米饭', cooking: '烧制', light: false, fried: false, image: 'rice', emoji: '🍲' },
   { id: 'potato-pork', main: '土豆炖瘦肉', name: '土豆瘦肉焖饭', subtitle: '软糯土豆与瘦肉同焖，一碗热乎踏实。', shop: '一碗日常 · 轻食厨房', price: 23, eta: 23, kcal: 560, protein: '猪肉蛋白', scenes: ['save', 'fast', 'warm'], tastes: ['家常', '清淡'], ingredients: ['猪肉', '土豆', '胡萝卜', '大米', '酱油'], staple: '米饭', cooking: '焖煮', light: true, fried: false, image: 'rice', emoji: '🥔' },
   { id: 'curry-chicken', main: '咖喱鸡', name: '椰香咖喱鸡饭', subtitle: '温和浓郁的咖喱鸡配米饭，香气足不辣口。', shop: '饭有引力 · 小碗食堂', price: 30, eta: 25, kcal: 660, protein: '鸡肉蛋白', scenes: ['fast'], tastes: ['浓郁'], ingredients: ['鸡肉', '牛奶', '土豆', '胡萝卜', '大米', '咖喱'], staple: '米饭', cooking: '炖煮', light: false, fried: false, image: 'rice', emoji: '🍛' },
-  { id: 'greens-noodle', main: '鲜虾汤面', name: '鲜虾鸡蛋汤面', subtitle: '清汤热面搭鲜虾、鸡蛋和时蔬，清爽暖胃。', shop: '面面俱到 · 手作面', price: 22, eta: 22, kcal: 490, protein: '高蛋白', scenes: ['warm', 'save', 'fast', 'focus'], tastes: ['清淡', '家常'], ingredients: ['海鲜', '虾', '鸡蛋', '荷兰豆', '面粉', '葱', '酱油'], staple: '面条', cooking: '水煮', light: true, fried: false, image: 'noodles', emoji: '🍜' }
+  { id: 'greens-noodle', main: '鲜虾汤面', name: '鲜虾鸡蛋汤面', subtitle: '清汤热面搭鲜虾、鸡蛋和时蔬，清爽暖胃。', shop: '面面俱到 · 手作面', price: 22, eta: 22, kcal: 490, protein: '高蛋白', scenes: ['warm', 'save', 'fast', 'focus'], tastes: ['清淡', '家常'], ingredients: ['海鲜', '虾', '鸡蛋', '荷兰豆', '面粉', '葱', '酱油'], staple: '面条', cooking: '水煮', light: true, fried: false, image: 'noodles', emoji: '🍜' },
+  { id: 'chili-steamed-chicken', main: '剁椒蒸鸡', name: '剁椒嫩鸡杂粮饭', subtitle: '清蒸去皮鸡胸配微辣剁椒与杂粮饭，解馋不油腻。', shop: '蒸有味 · 蒸菜馆', price: 27, eta: 24, kcal: 510, protein: '高蛋白', scenes: ['focus', 'fast'], tastes: ['香辣', '家常'], ingredients: ['鸡肉', '辣椒', '蒜', '西兰花', '糙米', '大米', '酱油'], staple: '杂粮饭', cooking: '清蒸', light: true, fried: false, image: 'hero-bowl', emoji: '🌶️' },
+  { id: 'sour-fish-soup', main: '金汤鱼片', name: '金汤酸菜鱼片饭', subtitle: '微酸开胃无刺鱼片配米饭，热汤暖身不油腻。', shop: '蒸有味 · 蒸菜馆', price: 31, eta: 26, kcal: 530, protein: '高蛋白', scenes: ['warm'], tastes: ['酸甜', '香辣', '浓郁'], ingredients: ['海鲜', '鱼', '酸菜', '辣椒', '青菜', '大米'], staple: '米饭', cooking: '炖煮', light: true, fried: false, image: 'vegetables', emoji: '🐟' },
+  { id: 'teriyaki-quinoa', main: '照烧鸡排', name: '照烧鸡排藜麦饭', subtitle: '少油慢煎鸡排配藜麦米饭和烤时蔬，饱腹耐饿。', shop: '一碗日常 · 轻食厨房', price: 31, eta: 25, kcal: 560, protein: '高蛋白', scenes: ['focus', 'fast'], tastes: ['酸甜', '浓郁', '家常'], ingredients: ['鸡肉', '西兰花', '胡萝卜', '藜麦', '大米', '酱油'], staple: '杂粮饭', cooking: '少油煎制', light: true, fried: false, image: 'hero-bowl', emoji: '🍗' },
+  { id: 'chicken-mushroom-noodle', main: '菌菇鸡汤', name: '松茸菌菇鸡汤面', subtitle: '慢炖清鸡汤配嫩鸡丝与时蔬，温和暖胃无负担。', shop: '面面俱到 · 手作面', price: 26, eta: 23, kcal: 520, protein: '高蛋白', scenes: ['warm', 'focus', 'fast'], tastes: ['清淡', '家常', '浓郁'], ingredients: ['鸡肉', '香菇', '青菜', '面粉', '姜', '葱'], staple: '面条', cooking: '炖煮', light: true, fried: false, image: 'noodles', emoji: '🍜' }
 ];
 
 export const DEFAULT_PREFS = {
@@ -84,16 +88,58 @@ export function reasonsFor(meal, prefs, history, date = new Date()) {
   return reasons;
 }
 
-export function buildWeekPlan(prefs, history = [], locked = {}, date = new Date()) {
+export function explainFunnel(prefs, history = [], date = new Date(), options = {}) {
+  const previous = history.find(h => h.date === yesterdayKey(date));
+  const blocked = new Set(prefs.blockedMains || []);
+  const skipToday = new Set(options.skipIds || []);
+  const maxEta = options.maxEta || null;
+
+  const list = MEALS;
+  const total = list.length;
+
+  const afterAvoid = list.filter(m => !m.ingredients.some(i => prefs.avoids.includes(i)));
+  const avoidRemoved = total - afterAvoid.length;
+
+  const afterHealth = afterAvoid.filter(m => (!prefs.light || (m.light && !m.fried)) && (!prefs.staple || m.staple));
+  const healthRemoved = afterAvoid.length - afterHealth.length;
+
+  const afterDedup = afterHealth.filter(m => (!previous || m.main !== previous.main) && !blocked.has(m.main) && !skipToday.has(m.id));
+  const dedupRemoved = afterHealth.length - afterDedup.length;
+
+  const afterBudget = afterDedup.filter(m => m.price <= prefs.budget && (!maxEta || m.eta <= maxEta));
+  const budgetRemoved = afterDedup.length - afterBudget.length;
+
+  return {
+    total,
+    avoidRemoved,
+    healthRemoved,
+    dedupRemoved,
+    budgetRemoved,
+    remaining: afterBudget.length,
+    yesterdayMain: previous?.main || null
+  };
+}
+
+export function matchPercent(meal, prefs, options = {}) {
+  const maxTaste = Math.max(1, Math.min(2, prefs.tastes.length || 1)) * 10;
+  const tasteHit = prefs.tastes.length ? Math.min(2, prefs.tastes.filter(t => meal.tastes.includes(t)).length) * 10 : 10;
+  const sceneBonus = options.sceneId ? (meal.scenes.includes(options.sceneId) ? 10 : 0) : 10;
+  const ratio = (tasteHit / maxTaste) * 0.65 + (sceneBonus / 10) * 0.2 + (meal.light ? 0.1 : 0.05) + (meal.staple ? 0.05 : 0.05);
+  return Math.min(99, Math.max(72, Math.round(70 + ratio * 29)));
+}
+
+export function buildWeekPlan(prefs, history = [], locked = {}, date = new Date(), offset = 0) {
   const days = ['周一', '周二', '周三', '周四', '周五'];
-  const candidates = recommend(prefs, history, date);
+  const rawCandidates = recommend(prefs, history, date);
+  const shift = rawCandidates.length > 1 ? ((offset % rawCandidates.length) + rawCandidates.length) % rawCandidates.length : 0;
+  const candidates = shift ? [...rawCandidates.slice(shift), ...rawCandidates.slice(0, shift)] : rawCandidates;
   const plan = [];
   let prevMain = history.find(h => h.date === yesterdayKey(date))?.main || null;
   const usedIds = new Set();
 
   for (let i = 0; i < days.length; i++) {
     const lockedId = locked[i];
-    const lockedMeal = lockedId ? candidates.find(m => m.id === lockedId) : null;
+    const lockedMeal = lockedId ? rawCandidates.find(m => m.id === lockedId) : null;
     let pick = lockedMeal;
     if (!pick) {
       pick = candidates.find(m => !usedIds.has(m.id) && m.main !== prevMain)
