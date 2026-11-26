@@ -109,7 +109,7 @@ function renderPrefs() {
 }
 
 function renderFunnel() {
-  const f = explainFunnel(prefs, history, new Date(), { skipIds: [...skipTodayIds], maxEta: activeMaxEta });
+  const f = explainFunnel(prefs, history, new Date(), { skipIds: [...skipTodayIds], maxEta: activeMaxEta, sceneId: activeScene });
   const steps = [
     `<span class="funnel-step">菜单库 ${f.total} 道</span>`
   ];
@@ -125,6 +125,10 @@ function renderFunnel() {
     steps.push(`<span class="funnel-step ${f.dedupRemoved ? 'active' : ''}">${label} ${f.dedupRemoved ? `-${f.dedupRemoved}` : '0'}</span>`);
   }
   steps.push(`<span class="funnel-step ${f.budgetRemoved ? 'active' : ''}">≤¥${prefs.budget}${activeMaxEta ? `·≤${activeMaxEta}分` : ''} ${f.budgetRemoved ? `-${f.budgetRemoved}` : '0'}</span>`);
+  if (activeScene && f.sceneRemoved) {
+    const sceneName = SCENES.find(s => s.id === activeScene)?.label || '当前场景';
+    steps.push(`<span class="funnel-step active">${escape(sceneName)} -${f.sceneRemoved}</span>`);
+  }
   steps.push(`<span class="funnel-step ${f.remaining ? 'result' : 'warn'}">可选 ${f.remaining} 道</span>`);
 
   $('#funnel-bar').innerHTML = steps.join('<span class="funnel-arrow" aria-hidden="true">→</span>');
@@ -146,7 +150,7 @@ function renderRecommendations() {
     return;
   }
 
-  const baseReasons = reasonsFor(meal, prefs, history);
+  const baseReasons = reasonsFor(meal, prefs, history, new Date(), { sceneId: activeScene });
   const aiReason = aiOverride && aiOverride.mealId === meal.id && aiOverride.reason ? aiOverride.reason : '';
   const pct = matchPercent(meal, prefs, { sceneId: activeScene });
   const today = history.find(h => h.date === dateKey());
@@ -362,7 +366,15 @@ document.addEventListener('click', event => {
     if (!scene) return;
     activeScene = activeScene === scene.id ? null : scene.id;
     activeMaxEta = activeScene === 'fast' ? 25 : null;
-    if (activeScene === 'save' && prefs.budget > 24) { prefs.budget = 24; writeStorage('lunch-prefs-v1', prefs); renderPrefs(); }
+    if (activeScene === 'save' && prefs.budget > 24) {
+      prefs.budget = 24;
+      writeStorage('lunch-prefs-v1', prefs);
+      renderPrefs();
+    } else if (activeScene === 'warm' && prefs.budget < 26) {
+      prefs.budget = 32;
+      writeStorage('lunch-prefs-v1', prefs);
+      renderPrefs();
+    }
     renderScenes();
     if (activeScene) {
       $('#lunch-request').value = scene.prompt;

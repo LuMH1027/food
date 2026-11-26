@@ -74,3 +74,13 @@ test('一周计划重排 offset 不改变锁定状态，且正确轮换未锁定
 test('Serverless AI 代理模块可正常加载', () => {
   assert.equal(typeof chatHandler, 'function');
 });
+test('月底省钱吃饱与想喝口热汤场景有明显结果区分', () => {
+  const saveList = recommend({ ...DEFAULT_PREFS, budget: 24 }, [], today, { sceneId: 'save' });
+  const warmList = recommend({ ...DEFAULT_PREFS, budget: 32 }, [], today, { sceneId: 'warm' });
+  assert.ok(saveList.length > 0 && warmList.length > 0);
+  assert.ok(saveList[0].price <= 24);
+  assert.notEqual(saveList[0].id, warmList[0].id);
+  assert.ok(warmList.every(m => m.staple === '面条' || /汤|炖/.test(m.name + m.main + m.subtitle)));
+  const warmFunnel = explainFunnel({ ...DEFAULT_PREFS, budget: 32 }, [], today, { sceneId: 'warm' });
+  assert.equal(warmFunnel.remaining, warmList.length);
+});
