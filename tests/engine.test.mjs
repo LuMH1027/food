@@ -23,9 +23,9 @@ test('昨天主菜跨套餐去重：鸡腿饭与鸡腿沙拉一起排除', () =>
   assert.ok(!result.some(m => m.main === '香煎鸡腿'));
 });
 test('前天和今天记录不当作昨天，不误排除', () => {
-  const history = [{ date: '2026-11-24', main: '香煎鸡腿' }, { date: '2026-11-26', main: '香菇青菜' }];
+  const history = [{ date: '2026-11-24', main: '香煎鸡腿' }, { date: '2026-11-26', main: '鲜虾汤面' }];
   assert.ok(recommend(prefs(), history, today).some(m => m.main === '香煎鸡腿'));
-  assert.ok(recommend(prefs(), history, today).some(m => m.main === '香菇青菜'));
+  assert.ok(recommend(prefs(), history, today).some(m => m.main === '鲜虾汤面'));
 });
 test('预算不足时显示空结果，不能自动放宽忌口或预算', () => {
   assert.deepEqual(recommend(prefs({ budget: 15 }), [], today), []);
@@ -56,7 +56,7 @@ test('所有菜单价格、主食、图片、标记完整，所有标记与说�
   for (const m of MEALS) {
     assert.ok(m.price > 0 && m.main && m.ingredients.length > 0);
     assert.ok(!m.fried || !m.light);
-    assert.ok(['rice', 'hero-bowl', 'vegetables'].includes(m.image));
+    assert.ok(['rice', 'hero-bowl', 'vegetables', 'noodles'].includes(m.image));
     assert.ok(!m.ingredients.includes('虾') || m.ingredients.includes('海鲜'));
     assert.ok(!m.ingredients.includes('鱼') || m.ingredients.includes('海鲜'));
   }
